@@ -29,6 +29,8 @@ def stream_graph_updates(user_input: str):
         for value in event.values():
             print("Assistant:",value["messages"][-1].content)
 
+# def llm_with_tools(user_input: str,)
+
 graph_builder = StateGraph(State)
 
 
@@ -42,7 +44,7 @@ graph_builder.set_entry_point("chatbot")
 graph_builder.set_finish_point("chatbot")
 graph = graph_builder.compile()
 
-tool = TavilySearchResults(max_results=2)
+# tool = TavilySearchResults(max_results=2)
 # tools = [tool]
 # tool.invoke("What's a 'node' in LangGraph?")
 # llm_with_tools = llm.bind_tools(tools)
