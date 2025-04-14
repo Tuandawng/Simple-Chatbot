@@ -7,6 +7,9 @@ from typing_extensions import TypedDict
 from langgraph.graph import StateGraph
 from langgraph.graph.message import add_messages
 from langchain_community.tools.tavily_search import TavilySearchResults
+from langchain.schema import AIMessage
+from langchain.agents import Tool, initialize_agent, AgentType
+from langchain.tools import tool 
 
 # Load environment variables
 load_dotenv()
@@ -41,18 +44,15 @@ You must use the Search tool if your knowledge may be outdated. Do not ask the u
 """.strip()
 
 
-
-
-
 # Setup LLM
 llm = ChatOllama(model="llama3.2:1b-instruct-q4_K_M")
 
 # ReAct parsing logic
-def parse_action(text: str):
-    match = re.search(r"Action:\s*(\w+)\[(.+?)\]", text)
-    if match:
-        return match.group(1), match.group(2)
-    return None, None
+# def parse_action(text: str):
+#     match = re.search(r'Action:\s*(\w+)\((.*?)\)', text)
+#     if match:
+#         return match.group(1), match.group(2)
+#     return None, None
 
 # Main chatbot logic
 def chatbot(state: State):
@@ -62,27 +62,38 @@ def chatbot(state: State):
     result = llm.invoke(history)
     output = result.content
     # history.append({"role": "assistant", "content": f"Observation: {search_tool.run()}"})
-    history.append({"role": "assistant", "content": output})
-
-
-    # Check for tool action in response
-    action, argument = parse_action(output)
-
-    if action == "Search":
-        observation = search_tool.run(argument)
-        history.append({"role": "tool", "content": f"Observation: {observation}"})
-
-        # Continue reasoning with tool result
-        followup = llm.invoke(history)
-        history.append({"role": "assistant", "content": followup.content})
-
+    history.append(AIMessage(content=output))
     return {"messages": history}
 
+    # Check for tool action in response
+@tool
+def search_function(query: str):
+    """Use this tool to search the web for current or real-time information."""
+    print(f"[TOOL CALLED] search_web({query})")
+    return search_tool.run(query)
+
+search_tool_function = Tool.from_function(
+    func=search_function,
+    name="Search",
+    description="Use this tool to search the web for current or real-time information."
+)
+
+agent = initialize_agent([search_tool_function], llm, agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,verbose=True)
+    
 # Graph definition
 graph_builder = StateGraph(State)
 graph_builder.add_node("chatbot", chatbot)
+# graph_builder.add_node("search", search_node)
+
 graph_builder.set_entry_point("chatbot")
 graph_builder.set_finish_point("chatbot")
+
+# graph_builder.add_conditional_edges("chatbot", route_logic, {
+#     "search": "search",
+#     "end": "chatbot",
+# })
+# graph_builder.add_edge("search", "chatbot")
+
 graph = graph_builder.compile()
 
 # Streaming graph output
@@ -92,8 +103,14 @@ def stream_graph_updates(user_input: str):
 
     for event in graph.stream({"messages": messages}):
         for value in event.values():
-            assistant_message = value["messages"][-1]["content"]
-            print("Assistant:", assistant_message)
+            last_message = value["messages"][-1]
+            try:
+                # Handles AIMessage or HumanMessage
+                print("Assistant:", last_message.content)
+            except AttributeError:
+                # Handles dicts (fallback)
+                print("Assistant:", last_message["content"])
+    return state
 
 # Interactive loop
 while True:
