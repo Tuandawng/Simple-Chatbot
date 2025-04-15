@@ -9,6 +9,7 @@ from langgraph.graph.message import add_messages
 from langchain_community.tools.tavily_search import TavilySearchResults
 # Use specific message types for clarity and potential downstream processing
 from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langgraph.checkpoint.memory import MemorySaver
 
 # Load environment variables
 load_dotenv()
@@ -22,6 +23,7 @@ search_tool = TavilySearchResults(max_results=3) # Limit results for brevity
 class State(TypedDict):
     messages: Annotated[List[BaseMessage], add_messages]
 
+memory = MemorySaver()
 # --- System Prompt (Further Improved Prompt - Focus on Final Answer after Search) ---
 system_prompt_content = """
 You are a helpful AI assistant with a knowledge cutoff of 2023. When a user asks a question that requires information beyond 2023, or about current events (2025), or anything outside your internal knowledge, you MUST use the Search tool to get up-to-date information.
@@ -158,7 +160,7 @@ while True:
         current_human_message = HumanMessage(content=user_input)
         conversation_history.append(current_human_message)
         graph_input = {"messages": conversation_history}
-
+# graph_input = {"messages": conversation_history, "thread_id": thread_id, "checkpoint_ns": "default", "checkpoint_id": "latest"}
         final_state_data = None # Initialize final_state here to None
         print("Assistant: ", end="", flush=True)
 
