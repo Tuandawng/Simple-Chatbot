@@ -104,17 +104,24 @@ def should_continue(state: State) -> str:
         return END
 
     # Check for "Action: Search(" to trigger tool use
-    if "Action: Search(" in last_message.content:
+    content = last_message.content.strip() # Strip leading/trailing whitespace
+
+    # Check for "Action: Search("
+    if "Action: Search(" in content:
         print("---DECISION: Action found, continue to tool---")
         return "continue"
-    elif "Final Answer:" in last_message.content: # Check for Final Answer to end
-        print("---DECISION: Final Answer found, finish---")
+    # Check if the stripped content ends with "Final Answer:"
+    elif content.lower().endswith("final answer:"):
+        print("---DECISION: Final Answer found (ends with), finish---")
+        return END
+    # Check if "Final Answer:" is present anywhere in the content
+    elif "Final Answer:" in content:
+        print("---DECISION: Final Answer found (present), finish---")
         return END
     else:
-        # Assume it's an intermediate thought or error if neither Action nor Final Answer
-        print("---DECISION: No Action or Final Answer, finish (fallback)---") # Modified decision
-        return END # End if no action or final answer is clearly indicated
-
+        # Assume it's an intermediate thought or error
+        print("---DECISION: No Action or Final Answer, finish (fallback)---")
+        return END
 # --- Graph Definition ---
 graph_builder = StateGraph(State)
 
@@ -179,8 +186,7 @@ while True:
 
             conversation_history = final_state["messages"]
 
-        else:
-             print("Error: Graph did not reach a final state.")
+        
 
 
     except Exception as e:
